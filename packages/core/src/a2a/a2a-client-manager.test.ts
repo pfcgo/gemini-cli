@@ -4,10 +4,19 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
+import {
+  vi,
+  describe,
+  it,
+  expect,
+  beforeEach,
+  afterEach,
+  type Mock,
+} from 'vitest';
 import { A2AClientManager } from './a2a-client-manager.js';
 import type { AgentCard } from '@a2a-js/sdk';
 import { A2AClient } from '@a2a-js/sdk/client';
+import { GoogleAuth } from 'google-auth-library';
 
 vi.mock('@a2a-js/sdk/client', () => {
   const A2AClient = vi.fn();
@@ -16,6 +25,12 @@ vi.mock('@a2a-js/sdk/client', () => {
   A2AClient.prototype.getTask = vi.fn();
   A2AClient.prototype.cancelTask = vi.fn();
   return { A2AClient };
+});
+
+vi.mock('google-auth-library', () => {
+  const GoogleAuth = vi.fn();
+  GoogleAuth.prototype.getClient = vi.fn();
+  return { GoogleAuth };
 });
 
 describe('A2AClientManager', () => {
@@ -60,6 +75,19 @@ describe('A2AClientManager', () => {
         status: { state: 'canceled' },
       },
     });
+
+    // Mock global.fetch for ADC tests
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        task: { id: '1', kind: 'task' },
+      }),
+    } as Response);
+
+    // Mock GoogleAuth
+    (GoogleAuth.prototype.getClient as Mock).mockResolvedValue({
+      getAccessToken: vi.fn().mockResolvedValue({ token: 'mock-adc-token' }),
+    });
   });
 
   afterEach(() => {
@@ -91,6 +119,52 @@ describe('A2AClientManager', () => {
       await expect(
         manager.loadAgent('TestAgent', 'http://another.agent'),
       ).rejects.toThrow("Agent with name 'TestAgent' is already loaded.");
+    });
+
+    it('should use ADC token when no access token is provided', async () => {
+      await manager.loadAgent('TestAgent', 'http://test.agent');
+
+      // Extract the fetch implementation passed to A2AClient
+      const options = (A2AClient as unknown as Mock).mock.calls[0][1];
+
+      // Call fetchImpl
+      await options.fetchImpl('http://test.agent/a2a/v1/message:send', {
+        method: 'POST',
+        headers: {},
+      });
+
+      // Verify GoogleAuth was used
+      expect(GoogleAuth.prototype.getClient).toHaveBeenCalled();
+
+      // Verify fetch was called with the Correct token
+      const fetchArgs = (global.fetch as Mock).mock.calls[0];
+      const fetchHeaders = fetchArgs[1].headers as Headers;
+      expect(fetchHeaders.get('Authorization')).toBe('Bearer mock-adc-token');
+    });
+
+    it('should use provided access token and NOT ADC when token is provided', async () => {
+      await manager.loadAgent(
+        'TestAgent',
+        'http://test.agent',
+        'explicit-token',
+      );
+
+      // Extract fetchImpl
+      const options = (A2AClient as unknown as Mock).mock.calls[0][1];
+
+      // Call fetchImpl
+      await options.fetchImpl('http://test.agent/a2a/v1/message:send', {
+        method: 'POST',
+        headers: {},
+      });
+
+      // Verify GoogleAuth was NOT used
+      expect(GoogleAuth.prototype.getClient).not.toHaveBeenCalled();
+
+      // Verify fetch was called with the explicit token
+      const fetchArgs = (global.fetch as Mock).mock.calls[0];
+      const fetchHeaders = fetchArgs[1].headers as Headers;
+      expect(fetchHeaders.get('Authorization')).toBe('Bearer explicit-token');
     });
   });
 

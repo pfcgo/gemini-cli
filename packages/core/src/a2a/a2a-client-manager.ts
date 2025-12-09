@@ -12,6 +12,7 @@ import type {
   SendMessageResponse,
 } from '@a2a-js/sdk';
 import { A2AClient, type A2AClientOptions } from '@a2a-js/sdk/client';
+import { GoogleAuth } from 'google-auth-library';
 import { v4 as uuidv4 } from 'uuid';
 
 // TODO: uncomment
@@ -25,6 +26,9 @@ export class A2AClientManager {
   private static instance: A2AClientManager;
   private clients = new Map<string, A2AClient>();
   private agentCards = new Map<string, AgentCard>();
+  private auth = new GoogleAuth({
+    scopes: ['https://www.googleapis.com/auth/cloud-platform'],
+  });
 
   private constructor() {}
 
@@ -139,6 +143,16 @@ export class A2AClientManager {
       const headers = new Headers(init?.headers);
       if (accessToken) {
         headers.set('Authorization', `Bearer ${accessToken}`);
+      } else {
+        try {
+          const client = await this.auth.getClient();
+          const token = await client.getAccessToken();
+          if (token.token) {
+            headers.set('Authorization', `Bearer ${token.token}`);
+          }
+        } catch (e) {
+          console.error('Failed to get ADC token:', e);
+        }
       }
       const newInit = { ...init, headers, body };
 
