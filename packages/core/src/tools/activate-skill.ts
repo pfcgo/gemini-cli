@@ -188,7 +188,7 @@ export class ActivateSkillTool extends BaseDeclarativeTool<
       params,
       messageBus,
       _toolName,
-      _toolDisplayName ?? `Skill: ${params.name}`,
+      _toolDisplayName ?? 'Activate Skill',
     );
   }
 }

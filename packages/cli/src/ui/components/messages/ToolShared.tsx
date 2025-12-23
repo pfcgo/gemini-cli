@@ -39,6 +39,7 @@ export const ToolStatusIndicator: React.FC<ToolStatusIndicatorProps> = ({
   const isSkill =
     name === ACTIVATE_SKILL_TOOL_NAME ||
     name === 'ActivateSkill' ||
+    name === 'Activate Skill' ||
     name.startsWith('Skill: ');
   const statusColor = isShell ? theme.ui.symbol : theme.status.warning;
   const skillIconColor = theme.text.accent;
@@ -97,6 +98,7 @@ export const ToolInfo: React.FC<ToolInfoProps> = ({
   const isSkill =
     name === ACTIVATE_SKILL_TOOL_NAME ||
     name === 'ActivateSkill' ||
+    name === 'Activate Skill' ||
     name.startsWith('Skill: ');
   const nameColor = React.useMemo<string>(() => {
     if (isSkill) {

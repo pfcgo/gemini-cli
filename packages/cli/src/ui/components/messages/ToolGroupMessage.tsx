@@ -59,6 +59,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
     (t) =>
       t.name === ACTIVATE_SKILL_TOOL_NAME ||
       t.name === 'ActivateSkill' ||
+      t.name === 'Activate Skill' ||
       t.name.startsWith('Skill: '),
   );
   const borderColor = isSkillActivation
