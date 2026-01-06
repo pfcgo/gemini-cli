@@ -11,7 +11,6 @@ import {
   loadSettings,
   SettingScope,
   type LoadedSettings,
-  type LoadableSettingScope,
 } from '../../config/settings.js';
 
 const emitConsoleLog = vi.hoisted(() => vi.fn());
@@ -43,6 +42,13 @@ vi.mock('../utils.js', () => ({
   exitCli: vi.fn(),
 }));
 
+vi.mock('chalk', () => ({
+  default: {
+    bold: vi.fn((s) => s),
+    dim: vi.fn((s) => s),
+  },
+}));
+
 describe('skills enable command', () => {
   const mockLoadSettings = vi.mocked(loadSettings);
 
@@ -57,8 +63,18 @@ describe('skills enable command', () => {
   describe('handleEnable', () => {
     it('should enable a disabled skill in user scope', async () => {
       const mockSettings = {
-        forScope: vi.fn().mockReturnValue({
-          settings: { skills: { disabled: ['skill1'] } },
+        merged: { skills: { disabled: ['skill1'] } },
+        forScope: vi.fn().mockImplementation((scope) => {
+          if (scope === SettingScope.User) {
+            return {
+              settings: { skills: { disabled: ['skill1'] } },
+              path: '/user/settings.json',
+            };
+          }
+          return {
+            settings: { skills: { disabled: [] } },
+            path: '/project/settings.json',
+          };
         }),
         setValue: vi.fn(),
       };
@@ -68,7 +84,6 @@ describe('skills enable command', () => {
 
       await handleEnable({
         name: 'skill1',
-        scope: SettingScope.User as LoadableSettingScope,
       });
 
       expect(mockSettings.setValue).toHaveBeenCalledWith(
@@ -78,7 +93,9 @@ describe('skills enable command', () => {
       );
       expect(emitConsoleLog).toHaveBeenCalledWith(
         'log',
-        'Skill "skill1" successfully enabled in scope "User".',
+        expect.stringContaining(
+          'enabled by removing it from the disabled list in user (/user/settings.json) and project (/project/settings.json) settings',
+        ),
       );
     });
 
@@ -86,22 +103,20 @@ describe('skills enable command', () => {
       const mockSettings = {
         forScope: vi.fn().mockReturnValue({
           settings: { skills: { disabled: [] } },
+          path: '/user/settings.json',
         }),
         setValue: vi.fn(),
       };
-      mockLoadSettings.mockReturnValue(
+      vi.mocked(loadSettings).mockReturnValue(
         mockSettings as unknown as LoadedSettings,
       );
 
-      await handleEnable({
-        name: 'skill1',
-        scope: SettingScope.User as LoadableSettingScope,
-      });
+      await handleEnable({ name: 'skill1' });
 
       expect(mockSettings.setValue).not.toHaveBeenCalled();
       expect(emitConsoleLog).toHaveBeenCalledWith(
         'log',
-        'Skill "skill1" is already enabled in scope "User".',
+        'Skill "skill1" is already enabled.',
       );
     });
   });
