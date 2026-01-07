@@ -184,6 +184,7 @@ const SETTINGS_SCHEMA = {
       vimMode: {
         type: 'boolean',
         label: 'Vim Mode',
+
         category: 'General',
         requiresRestart: false,
         default: false,
@@ -198,6 +199,20 @@ const SETTINGS_SCHEMA = {
         default: false,
         description: 'Disable Vim command mode',
         showInDialog: true,
+      },
+      vimModeStyle: {
+        type: 'enum',
+        label: 'Vim Mode Style',
+        category: 'General',
+        requiresRestart: false,
+        default: 'vim-editor',
+        description:
+          'Vim navigation style: "vim-editor" (full buffer) or "bash-vim" (command line history).',
+        showInDialog: true,
+        options: [
+          { value: 'vim-editor', label: 'Vim Editor (Full Buffer)' },
+          { value: 'bash-vim', label: 'Bash Vim (Command History)' },
+        ],
       },
       disableAutoUpdate: {
         type: 'boolean',

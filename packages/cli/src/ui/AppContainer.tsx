@@ -870,7 +870,10 @@ Logging in with Google... Restarting Gemini CLI to continue.
     isAlternateBuffer,
   ]);
 
-  const { handleInput: vimHandleInput } = useVim(buffer, handleFinalSubmit);
+  const { handleInput: vimHandleInput, count: vimCount } = useVim(
+    buffer,
+    handleFinalSubmit,
+  );
 
   /**
    * Determines if the input prompt should be active and accept user input.
@@ -1489,6 +1492,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       shellModeActive,
       userMessages: inputHistory,
       buffer,
+      vimCount,
       inputWidth,
       suggestionsWidth,
       isInputActive,
@@ -1577,6 +1581,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       shellModeActive,
       inputHistory,
       buffer,
+      vimCount,
       inputWidth,
       suggestionsWidth,
       isInputActive,

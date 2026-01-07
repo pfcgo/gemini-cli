@@ -18,6 +18,7 @@ export interface UseInputHistoryReturn {
   handleSubmit: (value: string) => void;
   navigateUp: () => boolean;
   navigateDown: () => boolean;
+  goToIndex: (index: number) => boolean;
 }
 
 export function useInputHistory({
@@ -103,9 +104,46 @@ export function useInputHistory({
     isActive,
   ]);
 
+  const goToIndex = useCallback(
+    (index: number) => {
+      if (!isActive) return false;
+      if (userMessages.length === 0 && index !== -1) return false;
+
+      // Ensure index is within bounds: -1 to userMessages.length - 1
+      const targetIndex = Math.max(
+        -1,
+        Math.min(index, userMessages.length - 1),
+      );
+
+      if (historyIndex === -1 && targetIndex !== -1) {
+        setOriginalQueryBeforeNav(currentQuery);
+      }
+
+      setHistoryIndex(targetIndex);
+
+      if (targetIndex === -1) {
+        onChange(originalQueryBeforeNav);
+      } else {
+        const newValue = userMessages[userMessages.length - 1 - targetIndex];
+        onChange(newValue);
+      }
+      return true;
+    },
+    [
+      historyIndex,
+      setHistoryIndex,
+      originalQueryBeforeNav,
+      onChange,
+      userMessages,
+      isActive,
+      currentQuery,
+    ],
+  );
+
   return {
     handleSubmit,
     navigateUp,
     navigateDown,
+    goToIndex,
   };
 }

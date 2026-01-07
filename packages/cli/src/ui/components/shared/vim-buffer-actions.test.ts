@@ -674,6 +674,109 @@ describe('vim-buffer-actions', () => {
         expect(result.lines[0]).toBe('hello');
       });
     });
+
+    describe('vim_delete_char_before', () => {
+      it('should delete character before cursor', () => {
+        const state = createTestState(['hello'], 0, 2); // on 'l'
+        const action = {
+          type: 'vim_delete_char_before' as const,
+          payload: { count: 1 },
+        };
+
+        const result = handleVimAction(state, action);
+        expect(result).toHaveOnlyValidCharacters();
+        expect(result.lines[0]).toBe('hllo');
+        expect(result.cursorCol).toBe(1);
+      });
+
+      it('should delete multiple characters before cursor', () => {
+        const state = createTestState(['hello'], 0, 3); // on second 'l'
+        const action = {
+          type: 'vim_delete_char_before' as const,
+          payload: { count: 2 },
+        };
+
+        const result = handleVimAction(state, action);
+        expect(result).toHaveOnlyValidCharacters();
+        expect(result.lines[0]).toBe('hlo');
+        expect(result.cursorCol).toBe(1);
+      });
+
+      it('should do nothing at start of line', () => {
+        const state = createTestState(['hello'], 0, 0);
+        const action = {
+          type: 'vim_delete_char_before' as const,
+          payload: { count: 1 },
+        };
+
+        const result = handleVimAction(state, action);
+        expect(result).toHaveOnlyValidCharacters();
+        expect(result.lines[0]).toBe('hello');
+        expect(result.cursorCol).toBe(0);
+      });
+    });
+
+    describe('vim_toggle_case', () => {
+      it('should toggle case of character at cursor', () => {
+        const state = createTestState(['Hello'], 0, 0); // on 'H'
+        const action = {
+          type: 'vim_toggle_case' as const,
+          payload: { count: 1 },
+        };
+
+        const result = handleVimAction(state, action);
+        expect(result).toHaveOnlyValidCharacters();
+        expect(result.lines[0]).toBe('hello');
+        expect(result.cursorCol).toBe(1); // Should advance
+      });
+
+      it('should toggle case of multiple characters', () => {
+        const state = createTestState(['Hello'], 0, 0);
+        const action = {
+          type: 'vim_toggle_case' as const,
+          payload: { count: 3 },
+        };
+
+        const result = handleVimAction(state, action);
+        expect(result).toHaveOnlyValidCharacters();
+        expect(result.lines[0]).toBe('hELlo');
+        expect(result.cursorCol).toBe(3);
+      });
+
+      it('should not go past end of line', () => {
+        const state = createTestState(['Hi'], 0, 0);
+        const action = {
+          type: 'vim_toggle_case' as const,
+          payload: { count: 5 },
+        };
+
+        const result = handleVimAction(state, action);
+        expect(result).toHaveOnlyValidCharacters();
+        expect(result.lines[0]).toBe('hI');
+        expect(result.cursorCol).toBe(1);
+      });
+    });
+
+    describe('vim_delete_to_line_start', () => {
+      it('should delete from cursor to start of line', () => {
+        const state = createTestState(['hello world'], 0, 5); // on space
+        const action = { type: 'vim_delete_to_line_start' as const };
+
+        const result = handleVimAction(state, action);
+        expect(result).toHaveOnlyValidCharacters();
+        expect(result.lines[0]).toBe(' world');
+        expect(result.cursorCol).toBe(0);
+      });
+
+      it('should do nothing at start of line', () => {
+        const state = createTestState(['hello'], 0, 0);
+        const action = { type: 'vim_delete_to_line_start' as const };
+
+        const result = handleVimAction(state, action);
+        expect(result).toHaveOnlyValidCharacters();
+        expect(result.lines[0]).toBe('hello');
+      });
+    });
   });
 
   describe('Insert mode commands', () => {

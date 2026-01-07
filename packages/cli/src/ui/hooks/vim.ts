@@ -237,6 +237,8 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
     [state.count],
   );
 
+  const vimModeStyle = settings.merged.general?.vimModeStyle || 'vim-editor';
+
   /** Executes common commands to eliminate duplication in dot (.) repeat command */
   const executeCommand = useCallback(
     (cmdType: string, count: number) => {
@@ -406,6 +408,18 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
         buffer.vimEscapeInsertMode();
         dispatch({ type: 'ESCAPE_TO_NORMAL' });
         updateMode('NORMAL');
+        return true;
+      }
+
+      // Handle Ctrl+w (delete word backward)
+      if (normalizedKey.ctrl && normalizedKey.name === 'w') {
+        buffer.vimDeleteWordBackward(1);
+        return true;
+      }
+
+      // Handle Ctrl+u (delete to start of line)
+      if (normalizedKey.ctrl && normalizedKey.name === 'u') {
+        buffer.vimDeleteToLineStart();
         return true;
       }
 
@@ -635,11 +649,20 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
             normalizedKey.sequence === '/' ||
             normalizedKey.sequence === '?')
         ) {
-          if (settings.merged.general?.disableVimCommandMode) {
-            // If disabled, let it fall through (or handle partially if needed, but likely just ignore/default)
-            // If we want existing behavior (search on /), we might need to let it fall through to InputPrompt?
-            // InputPrompt handles '/' by focusing input.
+          // In bash-vim mode, let InputPrompt handle / and ? for history search
+          if (
+            vimModeStyle === 'bash-vim' &&
+            (normalizedKey.sequence === '/' || normalizedKey.sequence === '?')
+          ) {
             return false;
+          }
+
+          if (settings.merged.general?.disableVimCommandMode) {
+            // When command mode is disabled, allow typing these characters
+            // by switching to INSERT mode first
+            updateMode('INSERT');
+            buffer.handleInput(normalizedKey);
+            return true;
           }
           updateMode('COMMAND');
           dispatch({
@@ -707,6 +730,15 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
           }
 
           case 'j': {
+            // In readline mode, let InputPrompt handle 'j' for history navigation
+            if (
+              vimModeStyle === 'bash-vim' &&
+              state.mode === 'NORMAL' &&
+              !state.pendingOperator
+            ) {
+              return false;
+            }
+
             // Check if this is part of a change command (cj)
             if (state.pendingOperator === 'c') {
               return handleChangeMovement('j');
@@ -719,6 +751,15 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
           }
 
           case 'k': {
+            // In readline mode, let InputPrompt handle 'k' for history navigation
+            if (
+              vimModeStyle === 'bash-vim' &&
+              state.mode === 'NORMAL' &&
+              !state.pendingOperator
+            ) {
+              return false;
+            }
+
             // Check if this is part of a change command (ck)
             if (state.pendingOperator === 'c') {
               return handleChangeMovement('k');
@@ -810,6 +851,13 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
             return true;
           }
 
+          case 'X': {
+            // Delete character before cursor (backspace behavior in vim)
+            buffer.vimDeleteCharBefore(repeatCount);
+            dispatch({ type: 'CLEAR_COUNT' });
+            return true;
+          }
+
           case 'x': {
             if (state.mode === 'VISUAL' || state.mode === 'VISUAL_LINE') {
               buffer.vimYankSelection();
@@ -825,6 +873,12 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
               type: 'SET_LAST_COMMAND',
               command: { type: CMD_TYPES.DELETE_CHAR, count: repeatCount },
             });
+            dispatch({ type: 'CLEAR_COUNT' });
+            return true;
+          }
+
+          case '~': {
+            buffer.vimToggleCase(repeatCount);
             dispatch({ type: 'CLEAR_COUNT' });
             return true;
           }
@@ -873,6 +927,12 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
             return true;
           }
 
+          case '|': {
+            buffer.vimMoveToLineStart();
+            dispatch({ type: 'CLEAR_COUNT' });
+            return true;
+          }
+
           case '$': {
             // Move to end of line
             buffer.vimMoveToLineEnd();
@@ -896,6 +956,27 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
           case 'g': {
             if (state.pendingOperator === 'g') {
               // Second 'g' - go to first line (gg command)
+              // In readline mode, let InputPrompt handle it (history) or map to history start
+              // But 'gg' isn't standard readline. Readline usually uses Meta-< to go to first history line.
+              // But if we want vim feel in readline mode, gg should probably go to start of history.
+              // Plan says: "G to history line N. Remove gg."
+              // Wait, remove gg? "Remove gg." in research.
+              // In plan: "j/k... G...". Nothing about gg.
+              // If we yield 'G' to parent, we can yield 'gg' too if we want.
+              // Let's assume standard behavior for now unless explicit.
+              // Plan says: "Readline Mode Behavior: ... G: Go to history entry N. ... "
+              // I will yield 'G' below.
+              // For 'gg', I'll keep it as buffer start for now unless it conflicts?
+              // Standard readline doesn't have 'gg'.
+              // I'll keep default behavior for 'gg' (buffer start) for now as it's not explicitly overridden in plan "Readline Mode Behavior" list (except maybe implicitly by "Remove gg" in research notes, but plan didn't list it in "Desired End State" list for Readline Mode).
+              // Actually, if j/k navigate history, then 'buffer' concept is single line?
+              // No, buffer is the input box content.
+              // If I am in readline mode, j/k go through history.
+              // Buffer navigation (multi-line input) becomes harder?
+              // Readline usually handles multi-line edit by navigating within the line(s) with h/l or other keys.
+              // But vertical movement usually means history.
+              // So 'gg' moving to first line of buffer might be confusing if the user expects history.
+              // But let's stick to explicit requirements.
               buffer.vimMoveToFirstLine();
               dispatch({ type: 'SET_PENDING_OPERATOR', operator: null });
             } else {
@@ -907,6 +988,14 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
           }
 
           case 'G': {
+            if (
+              vimModeStyle === 'bash-vim' &&
+              state.mode === 'NORMAL' &&
+              !state.pendingOperator
+            ) {
+              return false;
+            }
+
             if (state.count > 0) {
               // Go to specific line number (1-based) when a count was provided
               buffer.vimMoveToLine(state.count);
@@ -1215,12 +1304,14 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
       updateMode,
       handleCommandModeInput,
       settings.merged.general?.disableVimCommandMode,
+      vimModeStyle,
     ],
   );
 
   return {
     mode: state.mode,
     vimModeEnabled: vimEnabled,
+    count: state.count,
     lastCommand: state.lastCommand,
     lastFind: state.lastFind,
     handleInput, // Expose the input handler for InputPrompt to use

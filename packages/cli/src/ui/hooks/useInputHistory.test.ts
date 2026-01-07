@@ -259,4 +259,73 @@ describe('useInputHistory', () => {
       expect(mockOnChange).toHaveBeenCalledWith(originalQuery);
     });
   });
+
+  describe('goToIndex', () => {
+    it('should navigate to specific index and call onChange', () => {
+      const { result } = renderHook(() =>
+        useInputHistory({
+          userMessages,
+          onSubmit: mockOnSubmit,
+          isActive: true,
+          currentQuery: 'original',
+          onChange: mockOnChange,
+        }),
+      );
+
+      act(() => {
+        result.current.goToIndex(1); // Should be 'message 2'
+      });
+
+      expect(mockOnChange).toHaveBeenCalledWith(userMessages[1]);
+    });
+
+    it('should restore original query when navigating to index -1', () => {
+      const originalQuery = 'original input';
+      const { result } = renderHook(() =>
+        useInputHistory({
+          userMessages,
+          onSubmit: mockOnSubmit,
+          isActive: true,
+          currentQuery: originalQuery,
+          onChange: mockOnChange,
+        }),
+      );
+
+      // First navigate away
+      act(() => {
+        result.current.goToIndex(0);
+      });
+      expect(mockOnChange).toHaveBeenCalledWith(userMessages[2]);
+      mockOnChange.mockClear();
+
+      // Then go back to -1
+      act(() => {
+        result.current.goToIndex(-1);
+      });
+      expect(mockOnChange).toHaveBeenCalledWith(originalQuery);
+    });
+
+    it('should clamp index to valid range', () => {
+      const { result } = renderHook(() =>
+        useInputHistory({
+          userMessages,
+          onSubmit: mockOnSubmit,
+          isActive: true,
+          currentQuery: 'original',
+          onChange: mockOnChange,
+        }),
+      );
+
+      act(() => {
+        result.current.goToIndex(100); // Beyond length
+      });
+      expect(mockOnChange).toHaveBeenCalledWith(userMessages[0]); // Oldest message (index 2)
+
+      mockOnChange.mockClear();
+      act(() => {
+        result.current.goToIndex(-10); // Below -1
+      });
+      expect(mockOnChange).toHaveBeenCalledWith('original'); // Back to original
+    });
+  });
 });

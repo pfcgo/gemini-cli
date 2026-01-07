@@ -56,6 +56,14 @@
           "default": false,
           "type": "boolean"
         },
+        "vimModeStyle": {
+          "title": "Vim Mode Style",
+          "description": "Vim navigation style: \"vim-editor\" (full buffer) or \"bash-vim\" (command line history).",
+          "markdownDescription": "Vim navigation style: \"vim-editor\" (full buffer) or \"bash-vim\" (command line history).\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `vim-editor`",
+          "default": "vim-editor",
+          "type": "string",
+          "enum": ["vim-editor", "bash-vim"]
+        },
         "disableAutoUpdate": {
           "title": "Disable Auto Update",
           "description": "Disable automatic updates",

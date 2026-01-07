@@ -169,6 +169,8 @@ export const Composer = () => {
           focus={true}
           vimHandleInput={uiActions.vimHandleInput}
           vimMode={vimMode}
+          vimModeStyle={settings.merged.general?.vimModeStyle}
+          vimCount={uiState.vimCount}
           isEmbeddedShellFocused={uiState.embeddedShellFocused}
           popAllMessages={uiActions.popAllMessages}
           placeholder={

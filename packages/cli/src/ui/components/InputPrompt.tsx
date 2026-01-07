@@ -81,6 +81,8 @@ export interface InputPromptProps {
   onSuggestionsVisibilityChange?: (visible: boolean) => void;
   vimHandleInput?: (key: Key) => boolean;
   vimMode?: 'NORMAL' | 'INSERT' | 'VISUAL' | 'VISUAL_LINE' | 'COMMAND';
+  vimModeStyle?: 'vim-editor' | 'bash-vim';
+  vimCount?: number;
   isEmbeddedShellFocused?: boolean;
   setQueueErrorMessage: (message: string | null) => void;
   streamingState: StreamingState;
@@ -124,6 +126,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   onSuggestionsVisibilityChange,
   vimHandleInput,
   vimMode,
+  vimModeStyle,
+  vimCount,
   isEmbeddedShellFocused,
   setQueueErrorMessage,
   streamingState,
@@ -436,6 +440,48 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         return;
       }
 
+      // Handle yielded Vim keys for history navigation in readline style
+      if (vimMode === 'NORMAL' && vimModeStyle === 'bash-vim') {
+        if (key.sequence === 'k') {
+          if (!shellModeActive) {
+            if (tryLoadQueuedMessages()) {
+              return;
+            }
+            inputHistory.navigateUp();
+          } else {
+            const prevCommand = shellHistory.getPreviousCommand();
+            if (prevCommand !== null) buffer.setText(prevCommand);
+          }
+          return;
+        }
+        if (key.sequence === 'j') {
+          if (!shellModeActive) {
+            inputHistory.navigateDown();
+          } else {
+            const nextCommand = shellHistory.getNextCommand();
+            if (nextCommand !== null) buffer.setText(nextCommand);
+          }
+          return;
+        }
+        if (key.sequence === 'G') {
+          if (!shellModeActive) {
+            if (vimCount && vimCount > 0) {
+              // Vim 1G is oldest, G is newest.
+              // goToIndex(0) is newest, goToIndex(userMessages.length - 1) is oldest.
+              // So 1G should be goToIndex(userMessages.length - 1).
+              // [count]G -> index = userMessages.length - count?
+              // If count is 1, it should be the oldest message.
+              // If count is userMessages.length, it should be the newest message.
+              inputHistory.goToIndex(userMessages.length - vimCount);
+            } else {
+              // G without count goes to original query (index -1)
+              inputHistory.goToIndex(-1);
+            }
+          }
+          return;
+        }
+      }
+
       // Reset ESC count and hide prompt on any non-ESC key
       if (key.name !== 'escape') {
         if (escPressCount.current > 0 || showEscapePrompt) {
@@ -460,6 +506,14 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         !shellModeActive &&
         !vimSearchActive
       ) {
+        if (vimModeStyle === 'bash-vim') {
+          setCommandSearchActive(true);
+          setTextBeforeReverseSearch(buffer.text);
+          setCursorPosition(buffer.cursor);
+          buffer.setText('');
+          return;
+        }
+
         setVimSearchActive(true);
         setTextBeforeReverseSearch(buffer.text);
         setCursorPosition(buffer.cursor);
@@ -913,6 +967,9 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       setBannerVisible,
       vimMode,
       vimSearchActive,
+      vimModeStyle,
+      vimCount,
+      userMessages.length,
     ],
   );
 

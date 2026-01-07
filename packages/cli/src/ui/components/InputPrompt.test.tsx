@@ -207,6 +207,7 @@ describe('InputPrompt', () => {
       navigateUp: vi.fn(),
       navigateDown: vi.fn(),
       handleSubmit: vi.fn(),
+      goToIndex: vi.fn(),
     };
     mockedUseInputHistory.mockReturnValue(mockInputHistory);
 

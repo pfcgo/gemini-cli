@@ -153,6 +153,7 @@ export type VimAction = Extract<
   | { type: 'vim_change_line' }
   | { type: 'vim_delete_to_end_of_line' }
   | { type: 'vim_change_to_end_of_line' }
+  | { type: 'vim_delete_to_line_start' }
   | { type: 'vim_change_movement' }
   | { type: 'vim_move_left' }
   | { type: 'vim_move_right' }
@@ -162,6 +163,8 @@ export type VimAction = Extract<
   | { type: 'vim_move_word_backward' }
   | { type: 'vim_move_word_end' }
   | { type: 'vim_delete_char' }
+  | { type: 'vim_delete_char_before'; payload: { count: number } }
+  | { type: 'vim_toggle_case'; payload: { count: number } }
   | { type: 'vim_insert_at_cursor' }
   | { type: 'vim_append_at_cursor' }
   | { type: 'vim_open_line_below' }
@@ -405,6 +408,25 @@ export function handleVimAction(
           cpLen(currentLine),
           '',
         );
+      }
+      return state;
+    }
+
+    case 'vim_delete_to_line_start': {
+      if (cursorCol > 0) {
+        const nextState = pushUndo(state);
+        const result = replaceRangeInternal(
+          nextState,
+          cursorRow,
+          0,
+          cursorRow,
+          cursorCol,
+          '',
+        );
+        return {
+          ...result,
+          cursorCol: 0,
+        };
       }
       return state;
     }
@@ -819,6 +841,68 @@ export function handleVimAction(
           cursorCol + deleteCount,
           '',
         );
+      }
+      return state;
+    }
+
+    case 'vim_delete_char_before': {
+      const { count } = action.payload;
+      const { cursorRow, cursorCol } = state;
+
+      if (cursorCol > 0) {
+        const deleteCount = Math.min(count, cursorCol);
+        const startCol = cursorCol - deleteCount;
+        const nextState = pushUndo(state);
+        const result = replaceRangeInternal(
+          nextState,
+          cursorRow,
+          startCol,
+          cursorRow,
+          cursorCol,
+          '',
+        );
+        return {
+          ...result,
+          cursorCol: startCol,
+        };
+      }
+      return state;
+    }
+
+    case 'vim_toggle_case': {
+      const { count } = action.payload;
+      const { cursorRow, cursorCol, lines } = state;
+      const currentLine = lines[cursorRow] || '';
+      const lineCodePoints = toCodePoints(currentLine);
+
+      if (cursorCol < lineCodePoints.length) {
+        const nextState = pushUndo(state);
+        const endCol = Math.min(cursorCol + count, lineCodePoints.length);
+
+        let newText = '';
+        for (let i = cursorCol; i < endCol; i++) {
+          const char = lineCodePoints[i];
+          if (char === char.toUpperCase()) {
+            newText += char.toLowerCase();
+          } else {
+            newText += char.toUpperCase();
+          }
+        }
+
+        const result = replaceRangeInternal(
+          nextState,
+          cursorRow,
+          cursorCol,
+          cursorRow,
+          endCol,
+          newText,
+        );
+
+        // Move cursor forward
+        return {
+          ...result,
+          cursorCol: Math.min(endCol, lineCodePoints.length - 1),
+        };
       }
       return state;
     }

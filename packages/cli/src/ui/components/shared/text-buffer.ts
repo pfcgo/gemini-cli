@@ -966,6 +966,7 @@ export type TextBufferAction =
   | { type: 'vim_change_line'; payload: { count: number } }
   | { type: 'vim_delete_to_end_of_line' }
   | { type: 'vim_change_to_end_of_line' }
+  | { type: 'vim_delete_to_line_start' }
   | {
       type: 'vim_change_movement';
       payload: { movement: 'h' | 'j' | 'k' | 'l'; count: number };
@@ -979,6 +980,8 @@ export type TextBufferAction =
   | { type: 'vim_move_word_backward'; payload: { count: number } }
   | { type: 'vim_move_word_end'; payload: { count: number } }
   | { type: 'vim_delete_char'; payload: { count: number } }
+  | { type: 'vim_delete_char_before'; payload: { count: number } }
+  | { type: 'vim_toggle_case'; payload: { count: number } }
   | { type: 'vim_insert_at_cursor' }
   | { type: 'vim_append_at_cursor' }
   | { type: 'vim_open_line_below' }
@@ -1533,6 +1536,7 @@ function textBufferReducerLogic(
     case 'vim_change_line':
     case 'vim_delete_to_end_of_line':
     case 'vim_change_to_end_of_line':
+    case 'vim_delete_to_line_start':
     case 'vim_change_movement':
     case 'vim_move_left':
     case 'vim_move_right':
@@ -1542,6 +1546,8 @@ function textBufferReducerLogic(
     case 'vim_move_word_backward':
     case 'vim_move_word_end':
     case 'vim_delete_char':
+    case 'vim_delete_char_before':
+    case 'vim_toggle_case':
     case 'vim_insert_at_cursor':
     case 'vim_append_at_cursor':
     case 'vim_open_line_below':
@@ -1875,6 +1881,14 @@ export function useTextBuffer({
     dispatch({ type: 'vim_delete_char', payload: { count } });
   }, []);
 
+  const vimDeleteCharBefore = useCallback((count: number): void => {
+    dispatch({ type: 'vim_delete_char_before', payload: { count } });
+  }, []);
+
+  const vimToggleCase = useCallback((count: number): void => {
+    dispatch({ type: 'vim_toggle_case', payload: { count } });
+  }, []);
+
   const vimInsertAtCursor = useCallback((): void => {
     dispatch({ type: 'vim_insert_at_cursor' });
   }, []);
@@ -1897,6 +1911,10 @@ export function useTextBuffer({
 
   const vimInsertAtLineStart = useCallback((): void => {
     dispatch({ type: 'vim_insert_at_line_start' });
+  }, []);
+
+  const vimDeleteToLineStart = useCallback((): void => {
+    dispatch({ type: 'vim_delete_to_line_start' });
   }, []);
 
   const vimMoveToLineStart = useCallback((): void => {
@@ -2251,12 +2269,15 @@ export function useTextBuffer({
       vimMoveWordBackward,
       vimMoveWordEnd,
       vimDeleteChar,
+      vimDeleteCharBefore,
+      vimToggleCase,
       vimInsertAtCursor,
       vimAppendAtCursor,
       vimOpenLineBelow,
       vimOpenLineAbove,
       vimAppendAtLineEnd,
       vimInsertAtLineStart,
+      vimDeleteToLineStart,
       vimMoveToLineStart,
       vimMoveToLineEnd,
       vimMoveToFirstNonWhitespace,
@@ -2328,12 +2349,15 @@ export function useTextBuffer({
       vimMoveWordBackward,
       vimMoveWordEnd,
       vimDeleteChar,
+      vimDeleteCharBefore,
+      vimToggleCase,
       vimInsertAtCursor,
       vimAppendAtCursor,
       vimOpenLineBelow,
       vimOpenLineAbove,
       vimAppendAtLineEnd,
       vimInsertAtLineStart,
+      vimDeleteToLineStart,
       vimMoveToLineStart,
       vimMoveToLineEnd,
       vimMoveToFirstNonWhitespace,
@@ -2552,6 +2576,14 @@ export interface TextBuffer {
    */
   vimDeleteChar: (count: number) => void;
   /**
+   * Delete N characters before cursor (vim 'X' command)
+   */
+  vimDeleteCharBefore: (count: number) => void;
+  /**
+   * Toggle case of N characters (vim '~' command)
+   */
+  vimToggleCase: (count: number) => void;
+  /**
    * Enter insert mode at cursor (vim 'i' command)
    */
   vimInsertAtCursor: () => void;
@@ -2575,6 +2607,10 @@ export interface TextBuffer {
    * Move to first non-whitespace and enter insert mode (vim 'I' command)
    */
   vimInsertAtLineStart: () => void;
+  /**
+   * Delete from cursor to start of line (bash Ctrl-u behavior)
+   */
+  vimDeleteToLineStart: () => void;
   /**
    * Move cursor to beginning of line (vim '0' command)
    */

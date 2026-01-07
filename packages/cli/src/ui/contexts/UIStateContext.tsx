@@ -78,6 +78,7 @@ export interface UIState {
   shellModeActive: boolean;
   userMessages: string[];
   buffer: TextBuffer;
+  vimCount: number;
   inputWidth: number;
   suggestionsWidth: number;
   isInputActive: boolean;

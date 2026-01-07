@@ -4,10 +4,22 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
+import {
+  describe,
+  it,
+  expect,
+  vi,
+  beforeEach,
+  afterEach,
+  type Mock,
+} from 'vitest';
 import type React from 'react';
 import { act } from 'react';
-import { renderHook } from '../../test-utils/render.js';
+import {
+  renderHook,
+  mockSettings,
+  createMockSettings,
+} from '../../test-utils/render.js';
 import { waitFor } from '../../test-utils/async.js';
 import { useVim } from './vim.js';
 import type { VimMode } from './vim.js';
@@ -18,6 +30,7 @@ import type {
   TextBufferAction,
 } from '../components/shared/text-buffer.js';
 import { textBufferReducer } from '../components/shared/text-buffer.js';
+import { SettingsContext } from '../contexts/SettingsContext.js';
 
 // Mock the VimModeContext
 const mockVimContext = {
@@ -25,11 +38,28 @@ const mockVimContext = {
   vimMode: 'NORMAL' as VimMode,
   toggleVimEnabled: vi.fn(),
   setVimMode: vi.fn(),
+  setCommandBuffer: vi.fn(),
 };
 
 vi.mock('../contexts/VimModeContext.js', () => ({
   useVimMode: () => mockVimContext,
   VimModeProvider: ({ children }: { children: React.ReactNode }) => children,
+}));
+
+// Mock settings
+let currentMockSettings = mockSettings;
+
+vi.mock('../contexts/SettingsContext.js', () => ({
+  useSettings: () => currentMockSettings,
+  SettingsContext: {
+    Provider: ({
+      children,
+      value: _value,
+    }: {
+      children: React.ReactNode;
+      value: unknown;
+    }) => children,
+  },
 }));
 
 // Helper to create a full Key object from partial data
@@ -181,12 +211,22 @@ describe('useVim hook', () => {
       vimDeleteInnerWord: vi.fn(),
       vimChangeInnerWord: vi.fn(),
       vimYankInnerWord: vi.fn(),
+      vimDeleteCharBefore: vi.fn(),
+      vimToggleCase: vi.fn(),
+      vimDeleteToLineStart: vi.fn(),
     };
   };
 
   const renderVimHook = (buffer?: Partial<TextBuffer>) =>
-    renderHook(() =>
-      useVim((buffer || mockBuffer) as TextBuffer, mockHandleFinalSubmit),
+    renderHook(
+      () => useVim((buffer || mockBuffer) as TextBuffer, mockHandleFinalSubmit),
+      {
+        wrapper: ({ children }) => (
+          <SettingsContext.Provider value={currentMockSettings}>
+            {children}
+          </SettingsContext.Provider>
+        ),
+      },
     );
 
   const exitInsertMode = (result: {
@@ -371,6 +411,40 @@ describe('useVim hook', () => {
     });
   });
 
+  describe('INSERT mode shortcuts', () => {
+    it('should handle Ctrl+w (delete word backward)', () => {
+      const { result } = renderVimHook();
+
+      // Enter INSERT mode
+      act(() => {
+        result.current.handleInput(createKey({ sequence: 'i' }));
+      });
+
+      vi.clearAllMocks();
+      act(() => {
+        result.current.handleInput(createKey({ name: 'w', ctrl: true }));
+      });
+
+      expect(mockBuffer.vimDeleteWordBackward).toHaveBeenCalledWith(1);
+    });
+
+    it('should handle Ctrl+u (delete to line start)', () => {
+      const { result } = renderVimHook();
+
+      // Enter INSERT mode
+      act(() => {
+        result.current.handleInput(createKey({ sequence: 'i' }));
+      });
+
+      vi.clearAllMocks();
+      act(() => {
+        result.current.handleInput(createKey({ name: 'u', ctrl: true }));
+      });
+
+      expect(mockBuffer.vimDeleteToLineStart).toHaveBeenCalled();
+    });
+  });
+
   describe('Edit commands', () => {
     it('should handle x (delete character)', () => {
       const { result } = renderVimHook();
@@ -381,6 +455,28 @@ describe('useVim hook', () => {
       });
 
       expect(mockBuffer.vimDeleteChar).toHaveBeenCalledWith(1);
+    });
+
+    it('should handle X (delete character before)', () => {
+      const { result } = renderVimHook();
+      vi.clearAllMocks();
+
+      act(() => {
+        result.current.handleInput(createKey({ sequence: 'X' }));
+      });
+
+      expect(mockBuffer.vimDeleteCharBefore).toHaveBeenCalledWith(1);
+    });
+
+    it('should handle ~ (toggle case)', () => {
+      const { result } = renderVimHook();
+      vi.clearAllMocks();
+
+      act(() => {
+        result.current.handleInput(createKey({ sequence: '~' }));
+      });
+
+      expect(mockBuffer.vimToggleCase).toHaveBeenCalledWith(1);
     });
 
     it('should move cursor left when deleting last character on line (vim behavior)', () => {
@@ -545,13 +641,64 @@ describe('useVim hook', () => {
   describe('Disabled vim mode', () => {
     it('should not respond to vim commands when disabled', () => {
       mockVimContext.vimEnabled = false;
-      const { result } = renderVimHook(mockBuffer);
+      const { result } = renderVimHook();
 
-      act(() => {
-        result.current.handleInput(createKey({ sequence: 'h' }));
+      const handled = result.current.handleInput(createKey({ sequence: 'x' }));
+
+      expect(handled).toBe(false);
+      expect(mockBuffer.vimDeleteChar).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Disable Vim Command Mode', () => {
+    beforeEach(() => {
+      currentMockSettings = createMockSettings({
+        ...mockSettings.merged,
+        general: {
+          ...mockSettings.merged.general,
+          disableVimCommandMode: true,
+        },
       });
+    });
 
-      expect(mockBuffer.move).not.toHaveBeenCalled();
+    afterEach(() => {
+      currentMockSettings = mockSettings;
+    });
+
+    it('should switch to INSERT mode and handle / input', () => {
+      const { result } = renderVimHook();
+
+      const handled = result.current.handleInput(createKey({ sequence: '/' }));
+
+      expect(handled).toBe(true);
+      expect(mockVimContext.setVimMode).toHaveBeenCalledWith('INSERT');
+      expect(mockBuffer.handleInput).toHaveBeenCalledWith(
+        expect.objectContaining({ sequence: '/' }),
+      );
+    });
+
+    it('should switch to INSERT mode and handle : input', () => {
+      const { result } = renderVimHook();
+
+      const handled = result.current.handleInput(createKey({ sequence: ':' }));
+
+      expect(handled).toBe(true);
+      expect(mockVimContext.setVimMode).toHaveBeenCalledWith('INSERT');
+      expect(mockBuffer.handleInput).toHaveBeenCalledWith(
+        expect.objectContaining({ sequence: ':' }),
+      );
+    });
+
+    it('should switch to INSERT mode and handle ? input', () => {
+      const { result } = renderVimHook();
+
+      const handled = result.current.handleInput(createKey({ sequence: '?' }));
+
+      expect(handled).toBe(true);
+      expect(mockVimContext.setVimMode).toHaveBeenCalledWith('INSERT');
+      expect(mockBuffer.handleInput).toHaveBeenCalledWith(
+        expect.objectContaining({ sequence: '?' }),
+      );
     });
   });
 
@@ -794,6 +941,87 @@ describe('useVim hook', () => {
       });
 
       expect(testBuffer.vimMoveWordForward).toHaveBeenCalledWith(3);
+    });
+  });
+
+  describe('Readline Mode Alignment', () => {
+    it('should yield j, k, and G to parent when vimModeStyle is bash-vim', () => {
+      // Set bash-vim mode
+      currentMockSettings = createMockSettings({
+        ...mockSettings.merged,
+        general: {
+          ...mockSettings.merged.general,
+          vimModeStyle: 'bash-vim',
+        },
+      });
+
+      const { result } = renderVimHook();
+
+      // j should return false (not handled)
+      let handled: boolean | undefined;
+      act(() => {
+        handled = result.current.handleInput(createKey({ sequence: 'j' }));
+      });
+      expect(handled).toBe(false);
+      expect(mockBuffer.vimMoveDown).not.toHaveBeenCalled();
+
+      // k should return false (not handled)
+      act(() => {
+        handled = result.current.handleInput(createKey({ sequence: 'k' }));
+      });
+      expect(handled).toBe(false);
+      expect(mockBuffer.vimMoveUp).not.toHaveBeenCalled();
+
+      // G should return false (not handled)
+      act(() => {
+        handled = result.current.handleInput(createKey({ sequence: 'G' }));
+      });
+      expect(handled).toBe(false);
+      expect(mockBuffer.vimMoveToLastLine).not.toHaveBeenCalled();
+
+      // / should return false (not handled, to trigger history search)
+      act(() => {
+        handled = result.current.handleInput(createKey({ sequence: '/' }));
+      });
+      expect(handled).toBe(false);
+
+      // ? should return false (not handled, to trigger history search)
+      act(() => {
+        handled = result.current.handleInput(createKey({ sequence: '?' }));
+      });
+      expect(handled).toBe(false);
+
+      // Reset settings
+      currentMockSettings = mockSettings;
+    });
+
+    it('should NOT yield j, k, and G to parent when vimModeStyle is vim-editor', () => {
+      // Set vim-editor mode (default)
+      currentMockSettings = mockSettings;
+
+      const { result } = renderVimHook();
+
+      // j should return true (handled)
+      let handled: boolean | undefined;
+      act(() => {
+        handled = result.current.handleInput(createKey({ sequence: 'j' }));
+      });
+      expect(handled).toBe(true);
+      expect(mockBuffer.vimMoveDown).toHaveBeenCalled();
+
+      // k should return true (handled)
+      act(() => {
+        handled = result.current.handleInput(createKey({ sequence: 'k' }));
+      });
+      expect(handled).toBe(true);
+      expect(mockBuffer.vimMoveUp).toHaveBeenCalled();
+
+      // G should return true (handled)
+      act(() => {
+        handled = result.current.handleInput(createKey({ sequence: 'G' }));
+      });
+      expect(handled).toBe(true);
+      expect(mockBuffer.vimMoveToLastLine).toHaveBeenCalled();
     });
   });
 
