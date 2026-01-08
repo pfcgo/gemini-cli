@@ -138,6 +138,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   const { setEmbeddedShellFocused } = useUIActions();
   const { mainAreaWidth } = useUIState();
   const [justNavigatedHistory, setJustNavigatedHistory] = useState(false);
+  const lastBoundaryEventTimeRef = useRef<number>(0);
   const escPressCount = useRef(0);
   const [showEscapePrompt, setShowEscapePrompt] = useState(false);
   const escapeTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -269,6 +270,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     (newText: string, cursorPosition?: 'start' | 'end') => {
       buffer.setText(newText, cursorPosition);
       setJustNavigatedHistory(true);
+      lastBoundaryEventTimeRef.current = 0;
     },
     [buffer],
   );
@@ -728,6 +730,15 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           if (!isShortcut && !wasJustNavigated) {
             appEvents.emit(AppEvent.HistoryUpBoundary);
             setJustNavigatedHistory(true);
+            lastBoundaryEventTimeRef.current = Date.now();
+            return;
+          }
+
+          if (
+            !isShortcut &&
+            wasJustNavigated &&
+            Date.now() - lastBoundaryEventTimeRef.current < 500
+          ) {
             return;
           }
 
@@ -739,6 +750,15 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           if (!isShortcut && !wasJustNavigated) {
             appEvents.emit(AppEvent.HistoryDownBoundary);
             setJustNavigatedHistory(true);
+            lastBoundaryEventTimeRef.current = Date.now();
+            return;
+          }
+
+          if (
+            !isShortcut &&
+            wasJustNavigated &&
+            Date.now() - lastBoundaryEventTimeRef.current < 500
+          ) {
             return;
           }
 

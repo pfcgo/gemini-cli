@@ -2900,6 +2900,9 @@ describe('InputPrompt', () => {
           stdin.write('\u001B[A');
         });
 
+        // Wait for the history boundary protection delay
+        await new Promise((resolve) => setTimeout(resolve, 510));
+
         // Then go down
         await act(async () => {
           stdin.write(key);
@@ -3022,8 +3025,8 @@ describe('InputPrompt', () => {
         expect(emitSpy).toHaveBeenCalledWith(AppEvent.HistoryUpBoundary);
       });
 
-      // Brief wait to ensure React processes the state update
-      await new Promise((resolve) => setTimeout(resolve, 10));
+      // Wait to bypass the history boundary protection delay
+      await new Promise((resolve) => setTimeout(resolve, 510));
 
       // Second press (bypass)
       await act(async () => {
