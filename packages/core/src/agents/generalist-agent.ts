@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -25,6 +25,7 @@ export const GeneralistAgent = (
   displayName: 'Generalist Agent',
   description:
     "A general-purpose AI agent with access to all tools. Use it for complex tasks that don't fit into other specialized agents.",
+  experimental: true,
   inputConfig: {
     inputs: {
       request: {
@@ -50,7 +51,11 @@ export const GeneralistAgent = (
   },
   get promptConfig() {
     return {
-      systemPrompt: getCoreSystemPrompt(config, undefined, false),
+      systemPrompt: getCoreSystemPrompt(
+        config,
+        /*useMemory=*/ undefined,
+        /*interactiveOverride=*/ false,
+      ),
       query: '${request}',
     };
   },
