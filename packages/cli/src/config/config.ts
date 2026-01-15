@@ -284,10 +284,9 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
     yargsInstance.command(extensionsCommand);
   }
 
-  if (settings?.experimental?.skills ?? false) {
+  if (settings?.skills?.enabled ?? true) {
     yargsInstance.command(skillsCommand);
   }
-
   // Register hooks command if hooks are enabled
   if (getEnableHooksUI(settings)) {
     yargsInstance.command(hooksCommand);
@@ -707,7 +706,7 @@ export async function loadCliConfig(
     enableExtensionReloading: settings.experimental?.extensionReloading,
     enableAgents: settings.experimental?.enableAgents,
     plan: settings.experimental?.plan,
-    skillsSupport: settings.experimental?.skills,
+    skillsSupport: settings.skills?.enabled,
     disabledSkills: settings.skills?.disabled,
     experimentalJitContext: settings.experimental?.jitContext,
     noBrowser: !!process.env['NO_BROWSER'],

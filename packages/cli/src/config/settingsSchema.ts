@@ -1441,15 +1441,6 @@ const SETTINGS_SCHEMA = {
         description: 'Enable Just-In-Time (JIT) context loading.',
         showInDialog: false,
       },
-      skills: {
-        type: 'boolean',
-        label: 'Agent Skills',
-        category: 'Experimental',
-        requiresRestart: true,
-        default: false,
-        description: 'Enable Agent Skills (experimental).',
-        showInDialog: true,
-      },
       codebaseInvestigatorSettings: {
         type: 'object',
         label: 'Codebase Investigator Settings',
@@ -1596,6 +1587,15 @@ const SETTINGS_SCHEMA = {
     description: 'Settings for agent skills.',
     showInDialog: false,
     properties: {
+      enabled: {
+        type: 'boolean',
+        label: 'Enable Agent Skills',
+        category: 'Advanced',
+        requiresRestart: true,
+        default: true,
+        description: 'Enable Agent Skills.',
+        showInDialog: true,
+      },
       disabled: {
         type: 'array',
         label: 'Disabled Skills',
