@@ -4,12 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {
-  GenerateContentConfig,
-  PartListUnion,
-  Content,
-  Tool,
-  GenerateContentResponse,
+import {
+  type GenerateContentConfig,
+  type PartListUnion,
+  type Content,
+  type Tool,
+  type GenerateContentResponse,
+  FinishReason,
 } from '@google/genai';
 import {
   getDirectoryContextString,
@@ -73,6 +74,7 @@ export class GeminiClient {
     topK: 64,
   };
   private sessionTurnCount = 0;
+  private demoCounter = 0;
 
   private readonly loopDetector: LoopDetectionService;
   private readonly compressionService: ChatCompressionService;
@@ -518,6 +520,74 @@ export class GeminiClient {
       // Lock the model for the rest of the sequence
       this.currentSequenceModel = modelToUse;
       yield { type: GeminiEventType.ModelInfo, value: modelToUse };
+    }
+
+    if (process.env['GEMINI_DEMO_MODE']) {
+      // Add a fake delay to simulate thinking time
+      const delay = parseInt(process.env['GEMINI_DEMO_DELAY_MS'] || '1500', 10);
+      await new Promise((resolve) => setTimeout(resolve, delay));
+
+      const counter = this.demoCounter;
+      const responses = [
+        `Here are two of the top-selling battery options available at BestBuy.com:
+
+Duracell - Optimum AA Batteries (12-Pack)
+
+Price: $19.99
+Description: The Duracell Optimum AA batteries are our top-selling power source, providing enhanced performance and extra life for your devices. Featuring Adaptive Voltage Technology, these batteries deliver up to 2X longer life in some devices and extra power in others, making them ideal for high-drain electronics like gaming controllers and digital cameras. This convenient 12-pack ensures you have reliable power when you need it.
+Key Features: Adaptive Voltage Technology, Guaranteed for 10 years in storage, #1 Trusted Brand.
+
+***
+
+Energizer - Rechargeable AAA Batteries (4-Pack) with Charger
+
+Price: $24.99
+Description: A customer favorite for eco-conscious shoppers, the Energizer Rechargeable AAA battery kit offers a sustainable and cost-effective power solution. This bundle includes four pre-charged AAA rechargeable batteries and a compact Energizer Recharge Charger. The batteries can be recharged hundreds of times, reducing waste and saving money on disposable batteries. Perfect for everyday devices like remote controls, toys, and flashlights.,
+Key Features: Recharge up to 700 cycles, Includes 4 AAA batteries and charger, Saves money and holds 2 or 4 AA/AAA batteries, Long-lasting power.
+
+
+Do you want to order batteries online from Best Buy? I can place the order for you.
+`,
+
+        'In order to proceed, it is required to visit http://localhost:3000/recaptcha-verif and follow the instructions.',
+
+        `     
+        Elicitation successfully performed.
+     
+Proceeding to buy the Rechargeable AAA Batteries (4-Pack) with Charger.
+It will be shipped at your place on April 1st.
+`,
+      ];
+      const response = responses[counter % responses.length];
+
+      this.demoCounter++;
+
+      yield {
+        type: GeminiEventType.Content,
+        value: response,
+      };
+
+      // If we just showed the 2nd response (index 1), wait and show the 3rd.
+      if (counter % responses.length === 1) {
+        await new Promise((resolve) => setTimeout(resolve, 10000));
+        const nextResponse = responses[2];
+        yield {
+          type: GeminiEventType.Content,
+          value: nextResponse,
+        };
+        // We've shown two responses, so we need to increment the counter again
+        // to avoid re-showing the 3rd response on the next turn.
+        this.demoCounter++;
+      }
+
+      yield {
+        type: GeminiEventType.Finished,
+        value: {
+          reason: FinishReason.STOP,
+          usageMetadata: undefined,
+        },
+      };
+      return turn;
     }
 
     const resultStream = turn.run(modelToUse, request, linkedSignal);
