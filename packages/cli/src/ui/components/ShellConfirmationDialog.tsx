@@ -15,6 +15,12 @@ import { RenderInline } from '../utils/InlineMarkdownRenderer.js';
 import type { RadioSelectItem } from './shared/RadioButtonSelect.js';
 import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
 import { useKeypress } from '../hooks/useKeypress.js';
+import {
+  REDIRECTION_WARNING_NOTE_LABEL,
+  REDIRECTION_WARNING_NOTE_TEXT,
+  REDIRECTION_WARNING_TIP_LABEL,
+  REDIRECTION_WARNING_TIP_TEXT,
+} from '../textConstants.js';
 
 export interface ShellConfirmationRequest {
   commands: string[];
@@ -108,14 +114,14 @@ export const ShellConfirmationDialog: React.FC<
                 <Box />
                 <Box>
                   <Text color={theme.text.primary}>
-                    <Text bold>Note:</Text> Command contains redirection which
-                    can be undesirable.
+                    <Text bold>{REDIRECTION_WARNING_NOTE_LABEL}</Text>
+                    {REDIRECTION_WARNING_NOTE_TEXT}
                   </Text>
                 </Box>
                 <Box>
                   <Text color={theme.border.default}>
-                    Tip: Toggle auto-edit (Shift+Tab) to allow redirection in
-                    the future.
+                    <Text bold>{REDIRECTION_WARNING_TIP_LABEL}</Text>
+                    {REDIRECTION_WARNING_TIP_TEXT}
                   </Text>
                 </Box>
               </>
